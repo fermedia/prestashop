@@ -59,8 +59,8 @@ class BillmateCardpay extends PaymentModule
         $this->name = 'billmatecardpay';
         $this->moduleName='billmatecardpay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.35';
-        $this->author  = 'Billmate AB';
+        $this->version = '2.0';
+        $this->author  = 'eFinance Nordic AB';
 
         $this->currencies = true;
         $this->currencies_mode = 'radio';
@@ -280,7 +280,7 @@ class BillmateCardpay extends PaymentModule
 
 		$prompt = !empty($_POST['billmate_prompt_name'])? $_POST['billmate_prompt_name'] : 'NO';
 		$p3dsecure = !empty($_POST['billmate_3dsecure'])? $_POST['billmate_3dsecure'] : 'NO';
-		
+
         Configuration::updateValue('BILL_PRNAME', $prompt);
         Configuration::updateValue('BILL_3DSECURE', $p3dsecure );
 		

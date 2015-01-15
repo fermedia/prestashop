@@ -175,22 +175,28 @@ class BillmatePartpaymentController extends FrontController
 	{
 		if (!$this->billmate->active)
 			return ;
-		$pclass = new pClasses(
-			Configuration::get('BILLMATE_STORE_ID_'.$countries[$country->iso_code]['name']),
-			Configuration::get('BILLMATE_SECRET_'.$countries[$country->iso_code]['name']),
-			$countries[$country->iso_code]['code'],
-			$countries[$country->iso_code]['langue'],
-			$countries[$country->iso_code]['currency'],
-			Configuration::get('BILLMATE_MOD')
-		);
+		$countryString  = $countries[$country->iso_code]['code'];
+		$language = $countries[$country->iso_code]['langue'];
+		$currency = $countries[$country->iso_code]['currency'];
+		$countryname = BillmateCountry::getContryByNumber( BillmateCountry::fromCode($country->iso_code)  );
+		$countryname = Tools::strtoupper($countryname);
+
+		$eid    = Configuration::get('BILLMATE_STORE_ID_'.$countryname);
+		$secret = Configuration::get('BILLMATE_SECRET_'.$countryname);
+		$mode   = Configuration::get('BILLMATE_MOD');
+		$this->context->smarty->assign(array(
+			'eid' => $eid
+		));
+		$billmate = new pClasses($eid, $secret,$countryString, $language, $currency, $mode);
 
 		$accountPrice = array();
-		$pclasses = $pclass->getPClasses(Configuration::get('BILLMATE_STORE_ID_'.$countries[$country->iso_code]['name']));
-		$total = (float)$cart->getOrderTotal();
-		foreach ($pclasses as $val)
+		$pclasses = $billmate->getPClasses();
 
-			if ($val['minamount'] < $total)
-				$accountPrice[$val['id']] = array('price' => BillmateCalc::calc_monthly_cost($total, $val, BillmateFlags::CHECKOUT_PAGE), 'month' => (int)$val['months'], 'description' => htmlspecialchars_decode(Tools::safeOutput($val['description'])));
+		$total = (float)$cart->getOrderTotal();
+
+		foreach ($pclasses as $val)
+			if ($val['minamount'] < $total && ($total <= $val['maxamount'] || $val['maxamount'] == 0))
+				$accountPrice[$val['id']] = array('price' => BillmateCalc::calc_monthly_cost($total, $val, BillmateFlags::CHECKOUT_PAGE), 'month' => (int)$val['nbrofmonths'], 'description' => htmlspecialchars_decode(Tools::safeOutput($val['description'])));
 
 		return $accountPrice;
 	}

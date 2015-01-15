@@ -25,7 +25,7 @@ require_once(BBANK_BASE . '/Billmate.php');
  * 
  */
 define('BANKPAY_TESTURL', 'https://cardpay.billmate.se/pay/test');
-define('BANKPAY_LIVEURL', 'https://cardpay.billmate.se/pay');;
+define('BANKPAY_LIVEURL', 'https://cardpay.billmate.se/pay');
 
 class BillmateBank extends PaymentModule
 {
@@ -64,7 +64,7 @@ class BillmateBank extends PaymentModule
         $this->name = 'billmatebank';
         $this->moduleName='billmatebank';
         $this->tab = 'payments_gateways';
-        $this->version = '1.35';
+        $this->version = '2.0';
         $this->author  = 'Billmate AB';
 
         $this->currencies = true;
@@ -163,6 +163,7 @@ class BillmateBank extends PaymentModule
 		$statuses = OrderState::getOrderStates((int)$this->context->language->id);
 		foreach ($statuses as $status)
 			$statuses_array[$status['id_order_state']] = $status['name'];
+
 		foreach ($this->countries as $country)
 		{
 			$countryNames[$country['name']] = array('flag' => '../modules/'.$this->moduleName.'/img/flag_SWEDEN.png', 'country_name' => $country['name']);

@@ -98,7 +98,7 @@ class BillmateCalc
     {
         $monthsfee = 0;
         if ($flags === BillmateFlags::CHECKOUT_PAGE) {
-            $monthsfee = $pclass['invoicefee'];
+            $monthsfee = $pclass['handlingfee'];
         }
         $startfee = 0;
         if ($flags === BillmateFlags::CHECKOUT_PAGE) {
@@ -114,7 +114,7 @@ class BillmateCalc
         }
         $payment = self::_annuity(
             $sum,
-            $pclass['months'],
+            $pclass['nbrofmonths'],
             $pclass['interestrate']
         );
                 $payment += $monthsfee;
@@ -124,7 +124,7 @@ class BillmateCalc
             $monthsfee,
             $minpay,
             $payment,
-            $pclass['months'],
+            $pclass['nbrofmonths'],
             $base
         );
     }
@@ -166,7 +166,7 @@ class BillmateCalc
         }
         $monthsfee = 0;
         if ($flags === BillmateFlags::CHECKOUT_PAGE) {
-            $monthsfee = $pclass['invoicefee'];
+            $monthsfee = $pclass['handlingfee'];
         }
         $startfee = 0;
         if ($flags === BillmateFlags::CHECKOUT_PAGE) {
@@ -181,16 +181,16 @@ class BillmateCalc
         }
                 $payment = self::_annuity(
             $sum,
-            $pclass['months'],
+            $pclass['nbrofmonths'],
             $pclass['interestrate']
         ) + $monthsfee;
         $type = $pclass['type'];
 		
 		return round(
 			self::_aprAnnuity(
-				$sum, $pclass['months'],
+				$sum, $pclass['nbrofmonths'],
 				$pclass['interestrate'],
-				$pclass['invoicefee'],
+				$pclass['handlingfee'],
 				$minpay
 			),
 			2

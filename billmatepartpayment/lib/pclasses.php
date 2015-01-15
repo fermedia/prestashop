@@ -14,7 +14,7 @@ class pClasses{
 		$this->config['language'] = $language;
 		$this->config['currency'] = $currency;
 		$this->config['mode'] = $mode;
-		$this->getPClasses($eid);  
+		$this->getPClasses($eid);
 	}
 	public function clear(){
 		Db::getInstance()->Execute('truncate `'._DB_PREFIX_.'billmate_payment_pclasses`');
@@ -23,77 +23,33 @@ class pClasses{
 		$testmode = $mode == 'beta';
         $ssl=true;
         $debug = false;
-		
-        $billmate = new Billmate($eid, $secret, $ssl, $debug, $testmode);         
-		switch ($country) {
-			// Sweden
-			case 'SE':
-				$country = 209;
-				$language = 138;
-				$encoding = 2;
-				$currency = 0;
-				break;
-			// Finland
-			case 'FI':
-				$country = 73;
-				$language = 37;
-				$encoding = 4;
-				$currency = 2;
-				break;
-			// Denmark
-			case 'DK':
-				$country = 59;
-				$language = 27;
-				$encoding = 5;
-				$currency = 3;
-				break;
-			// Norway	
-			case 'NO':
-				$country = 164;
-				$language = 97;
-				$encoding = 3;
-				$currency = 1;
+        $billmate = new Billmate($eid, $secret, $ssl, $debug, $testmode);
 
-				break;
-			// Germany	
-			case 'DE':
-				$country = 81;
-				$language = 28;
-				$encoding = 6;
-				$currency = 2;
-				break;
-			// Netherlands															
-			case 'NL':
-				$country = 154;
-				$language = 101;
-				$encoding = 7;
-				$currency = 2;
-				break;
-		}
-        
-        $additionalinfo = array(
-	        "currency"=>$currency,//SEK
-	        "country"=>$country,//Sweden
-	        "language"=>$language,//Swedish
-        );
-        $data = $billmate->FetchCampaigns($additionalinfo);
-		
+		$additionalinfo = array();
+		$additionalinfo['PaymentData'] = array(
+			"currency" => strtoupper($currency),
+			"language" => strtolower($language),
+			"country" => strtolower($country),
+		);
+
+        $data = $billmate->GetPaymentPlans($additionalinfo);
+
 		$db = Db::getInstance();
 		$db->Execute('TRUNCATE TABLE `'._DB_PREFIX_.'billmate_payment_pclasses`');
 		if( !is_array($data)){
 			throw new Exception(strip_tags($data));
 		} else {
 			array_walk($data, array($this,'correct_lang_billmate'));
-			foreach($data as $_row){
+			foreach($data as $key => $_row){
+				if( empty($_row['minamount']) ) continue;
+				$_row['country'] = 209;
 				$_row['eid'] = $eid;
-				$_row['country'] = $country;
-				
+				$_row['id'] = ($key+1);
 				if((version_compare(_PS_VERSION_,'1.5','>='))){
 					Db::getInstance()->insert('billmate_payment_pclasses',$_row);
 				} else {
 					$data = $_row;
 					array_walk($data,create_function('&$value, $idx','$value = "`".$idx."`=\'$value\'";'));
-				
 					$result &= $db->Execute('insert into `'._DB_PREFIX_.'billmate_payment_pclasses` SET '.implode(',',$data));
 				}
 			}
@@ -101,32 +57,32 @@ class pClasses{
 	}
 	
     function correct_lang_billmate(&$item, $index){
-        $keys = array('id', 'description','months', 'startfee','invoicefee','interestrate', 'minamount', 'country', 'type', 'expire', 'maxamount' );
-        $item[1] = utf8_encode($item[1]);
-        $item = array_combine( $keys, $item );
-        $item['startfee'] = $item['startfee'] / 100;
-        $item['invoicefee'] = $item['invoicefee'] / 100;
-        $item['interestrate'] = $item['interestrate'] / 100;
-        $item['minamount'] = $item['minamount'] / 100;
-        $item['maxamount'] = $item['maxamount'] / 100;
+		$item['startfee'] /= 100;
+		$item['handlingfee'] /= 100;
+		$item['minamount'] /= 100;
+		$item['maxamount'] /= 100;
+        $keys = array('description', 'nbrofmonths', 'startfee','handlingfee', 'minamount', 'maxamount', 'type', 'expirydate', 'interestrate' );
+        foreach( $item as $key=>$ele ) 
+			if( !in_array($key, $keys) ) unset($item[$key]);
     }
 	
 	public function getCheapestPClass($sum, $flags){
         $lowest_pp = $lowest = false;
-		
+
 		$pclasses = $this->getPClasses();
         foreach ( $pclasses as $pclass) {
 			if( $pclass !== false ){
 				$lowest_payment = BillmateCalc::get_lowest_payment_for_account( $pclass['country'] );
 				if ($pclass['type'] < 2 && $sum >= $pclass['minamount'] && ($sum <= $pclass['maxamount'] || $pclass['maxamount'] == 0) ) {
 					$minpay = BillmateCalc::calc_monthly_cost( $sum, $pclass, $flags );
-
+					
 					if ($minpay < $lowest_pp || $lowest_pp === false) {
 						if ($minpay >= $lowest_payment ) {
 							$lowest_pp = $minpay;
 							$lowest = $pclass;
 						}
 					}
+					
 				}
 			}
         }

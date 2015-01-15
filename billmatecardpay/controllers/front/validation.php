@@ -30,71 +30,60 @@ class BillmateCardpayValidationModuleFrontController extends ModuleFrontControll
 		if (!Validate::isLoadedObject($customer))
 			Tools::redirectLink(__PS_BASE_URI__.'order&step=1');
 		
-		if( empty($_POST)){
-			$post = $_GET;
-		}else{
-			$post=$_POST;
-		}
-		$post = $_REQUEST;
-	    if (isset($post['status']) && !empty($post['trans_id']) && !empty($post['error_message']))
+		$_DATA = json_decode(stripslashes($_REQUEST['data']), true);
+		if(isset($_DATA['status']) && !empty($_DATA['number']))
 		{
-	
-			$ids = explode("-",$_REQUEST['order_id']);
+			$ids = explode("-",$_DATA['orderid']);
 			if( sizeof($ids) < 2 ) return false;
-			$_REQUEST['order_id'] = $ids[0];
-			$_REQUEST['cart_id'] = $ids[1];
-			$post = $_REQUEST;
+			$_DATA['order_id'] = $ids[0];
+			$_DATA['cart_id'] = $ids[1];
+			$invoiceid = $_DATA['number'];
 			
-			$this->context->cart->id = (int)$_POST['cart_id'];
+			$this->context->cart->id = (int)$_DATA['cart_id'];
 			
 			$eid = (int)Configuration::get('BCARDPAY_STORE_ID_SETTINGS');
 			
-		    if( $post['status'] == 0 ){
+		    if( $_DATA['status'] == 'Paid' ){
 		        try{
 					
 					$data = $measurements = array();
 					
-					$order = new Order($_REQUEST['order_id']);
-					$orderhistory = OrderHistory::getLastOrderState((int)$_REQUEST['order_id']);
+					$order = new Order($_DATA['order_id']);
+					$orderhistory = OrderHistory::getLastOrderState((int)$_DATA['order_id']);
 
 					if( $orderhistory->id != Configuration::get('BCARDPAY_ORDER_STATUS_SETTINGS')){
 
 						$t = new billmateCart();
-						$t->id = $post['order_id'];
-						$timestart = $timetotalstart = microtime(true);
-						$data_return = $this->processReserveInvoice( strtoupper($this->context->country->iso_code));
-						$measurements['after_add_invoice'] =  microtime(true) - $timestart;
-						extract($data_return);
-						
-						
-					   // $customer = new Customer((int)$this->context->cart->id_customer);
-						$total = $this->context->cart->getOrderTotal(true, Cart::BOTH); 
-						$extra = array('transaction_id'=>$invoiceid);
-						$t->completeOrder($extra,$this->context->cart->id);
-						$this->module->currentOrder = $_REQUEST['order_id'];
+						$t->id = $_DATA['order_id'];
+
 						$timestart = microtime(true);
 						$customer = new Customer((int)$this->context->cart->id_customer);
 						$measurements['after_customer'] =  microtime(true) - $timestart;
-						
+
 						$timestart = microtime(true);
-						$total = $this->context->cart->getOrderTotal(true, Cart::BOTH); 
+						$total = $this->context->cart->getOrderTotal(true, Cart::BOTH);
 						$measurements['calculatetotal'] = microtime(true) - $timestart;
 						
 						$timestart = microtime(true);
 						$extra = array('transaction_id'=>$invoiceid);
-					   // $this->module->validateOrder((int)$this->context->cart->id, Configuration::get('PS_OS_PREPARATION'), $total, $this->module->displayName, null, $extra, null, false, $customer->secure_key);
+						$t->completeOrder($extra,$this->context->cart->id);
+						//$this->module->validateOrder((int)$this->context->cart->id, Configuration::get('PS_OS_PREPARATION'), $total, $this->module->displayName, null, $extra, null, false, $customer->secure_key);
 						$measurements['validateorder'] = microtime(true) - $timestart;
 						
 						$timestart = microtime(true);
-						//$api->UpdateOrderNo((string)$invoiceid, $this->module->currentOrderReference.','.$this->module->currentOrder);
-						//unset($_SESSION["uniqueId"]);
-						//$measurements['update_order_no'] = microtime(true) - $timestart;
-						//$duration = ( microtime(true)-$timetotalstart ) * 1000;
+						if( (Configuration::get('BCARDPAY_AUTHMOD') != 'sale') ) {
+							$k = $this->getBillmate();
+							$k->UpdatePayment( array('PaymentData'=> array("number"=>(string)$invoiceid, "orderid"=>(string)$_DATA['order_id'], "currency" => "SEK", "language" => "sv", "country" => "se")) );
+						}
+						unset($_SESSION["uniqueId"]);
+						$measurements['update_order_no'] = microtime(true) - $timestart;
+						$duration = ( microtime(true)-$timetotalstart ) * 1000;
+
 						//$api->stat("client_card_order_measurements", json_encode(array('order_id'=>$this->module->currentOrder, 'measurements'=>$measurements)), '', $duration);
 					} else {
 						$customer = new Customer((int)$this->context->cart->id_customer);
 					}					
-					$this->module->currentOrder = $_REQUEST['order_id'];
+					$this->module->currentOrder = $_DATA['order_id'];
 					if( isset($_SESSION['billmate_order_id'])){
 						unset($_SESSION['billmate_order_id']);
 					}
@@ -105,10 +94,10 @@ class BillmateCardpayValidationModuleFrontController extends ModuleFrontControll
     		       $this->context->smarty->assign('error_message', utf8_encode($ex->getMessage())) ;
 		        }
 		    } else {
-		       $this->context->smarty->assign('error_message', $post['error_message']) ;
+		       $this->context->smarty->assign('error_message', $_DATA['status']) ;
 		    }
 		}
-		$len = strlen( $post['error_message']) > 0;
+		$len = strlen( $_DATA['status']) > 0;
 		$this->context->smarty->assign('posted', $len) ;
 	}
 
@@ -117,35 +106,19 @@ class BillmateCardpayValidationModuleFrontController extends ModuleFrontControll
 	 */
 	public function initContent()
 	{
-		//$this->context->smarty->assign('priceDisplayPrecision', 0);
 		$this->display_column_left = false;
 		parent::initContent();
-		$accept_url = $this->context->link->getModuleLink('billmatecardpay', 'validation', array(), true);
-		$cancel_url = $this->context->link->getModuleLink('billmatecardpay', 'cancelorder', array(), true);
-		$amount     = round($this->context->cart->getOrderTotal(true, Cart::BOTH),2)*100;
-		$order_id   = time();
-		$currency   = $this->context->currency->iso_code;
-		$languageCode= strtoupper( $this->context->language->iso_code );
-		
-		$languageCode = $languageCode == 'DA' ? 'DK' : $languageCode;
-		$languageCode = $languageCode == 'SV' ? 'SE' : $languageCode;
-		$languageCode = $languageCode == 'EN' ? 'GB' : $languageCode;
-		
-		$merchant_id = (int)Configuration::get('BCARDPAY_STORE_ID_SETTINGS');
-		$secret = substr(Configuration::get('BCARDPAY_SECRET_SETTINGS'),0,12);
-		$callback_url = $this->context->link->getModuleLink('billmatecardpay', 'callback', array(), true);
-		
-		$do_3d_secure = Configuration::get('BILL_3DSECURE') == 'YES'? 'YES': 'NO';
-		$prompt_name_entry = Configuration::get('BILL_PRNAME') == 'YES'? 'YES': 'NO';
-		$return_method = strlen(Configuration::get('BCARDPAY_METHOD')) ? 'GET' : 'GET';
 		
 		$t = new billmateCart();
 		$t->name="billmatecardpay";
 		$extra = array('transaction_id'=>time());
 		$customer = new Customer((int)$this->context->cart->id_customer);
-
-		if( isset($_SESSION['billmate_order_id'])){
+		if(isset($_SESSION['INVOICE_CREATED_CARD']) ){
 			$t->cancelOrder($_SESSION['billmate_order_id']);
+			unset($_SESSION['INVOICE_CREATED_CARD']);
+		}
+		if( isset($_SESSION['billmate_order_id'])){
+			if(!isset($_REQUEST['pay_method'])) $t->cancelOrder($_SESSION['billmate_order_id']);
 			unset($_SESSION['billmate_order_id']);
 		}
 
@@ -155,207 +128,26 @@ class BillmateCardpayValidationModuleFrontController extends ModuleFrontControll
 		}catch(Exception $ex ){
 			echo $ex->getMessage();
 		}
-
 		
 		$order_id = $_SESSION['billmate_order_id'] = $t->currentOrder;
-		$sendtohtml = $order_id.'-'.$this->context->cart->id;
-		
-		unset($_SESSION['INVOICE_CREATED_CARD']);
-        $data = array(
-		    'gatewayurl' => Configuration::get('BCARDPAY_MOD') == 0 ? CARDPAY_LIVEURL : CARDPAY_TESTURL,
-		    'order_id'   => $sendtohtml,
-		    'amount'     => $amount,
-		    'merchant_id'=> $merchant_id,
-		    'currency'   => $currency,
-			'language'	 => $languageCode,
-			'pay_method' => 'CARD',
-		    'accept_url' => $accept_url,
-			'callback_url'=> $callback_url,
-			'return_method'=> $return_method,
-			'capture_now' => Configuration::get('BCARDPAY_AUTHMOD') == 'sale'? 'YES': 'NO',
-			'do_3d_secure' => $do_3d_secure,
-			'prompt_name_entry' => $prompt_name_entry,
-		    'cancel_url' => $cancel_url,
-			'total'      => $total,
-			'this_path'  => $this->module->getPathUri(),
-			'this_path_ssl' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->module->name.'/'
-		);
-		$mac_str = $accept_url . $amount . $callback_url .  $cancel_url . $data['capture_now'] . $currency. $do_3d_secure . $languageCode . $merchant_id . $sendtohtml . 'CARD' . $prompt_name_entry . $return_method. $secret;
-		
-		$data['mac'] = hash('sha256', $mac_str);
-		$this->logData($merchant_id);
+		$orderid = $order_id.'-'.$this->context->cart->id;
+
+		$data_return = $this->processReserveInvoice( strtoupper($this->context->country->iso_code), $orderid);	
+		$data['url'] = $data_return->url;
 		$this->context->smarty->assign($data);
 		$this->setTemplate('validation.tpl');
 	}
 	public function logData($merchant_id){
 
 		if(isset( $_REQUEST['order_id'])) $order_id = $_REQUEST['order_id'];
+
 		$timetotalstart = microtime(true);
-        $adrsDelivery = new Address((int)$this->context->cart->id_address_delivery);
-        $adrsBilling = new Address((int)$this->context->cart->id_address_invoice);
-
-        $country_to_currency = array(
-            'NOR' => 'NOK',
-            'SWE' => 'SEK',
-            'FIN' => 'EUR',
-            'DNK' => 'DKK',
-            'DEU' => 'EUR',
-            'NLD' => 'EUR',
-        );
-
-		$encoding = 2;
-        $country = new Country(intval($adrsDelivery->id_country));
-        
-        $countryname = BillmateCountry::getContryByNumber( BillmateCountry::fromCode($country->iso_code)  );
-        $countryname = Tools::strtoupper($countryname);
-		$country = $countryname == 'SWEDEN' ? 209 : $countryname;
-		
-        $ship_address = array(
-            'email'           => $this->context->customer->email,
-            'telno'           => $adrsDelivery->phone,
-            'cellno'          => $adrsDelivery->phone_mobile,
-            'fname'           => $adrsDelivery->firstname,
-            'lname'           => $adrsDelivery->lastname,
-            'company'         => $adrsDelivery->company,
-            'careof'          => '',
-            'street'          => $adrsDelivery->address1,
-            'zip'             => $adrsDelivery->postcode,
-            'city'            => $adrsDelivery->city,
-            'country'         => (string)$countryname,
-        );
-
-        $country = new Country(intval($adrsBilling->id_country));
-        
-        $countryname = BillmateCountry::getContryByNumber( BillmateCountry::fromCode($country->iso_code)  );
-        $countryname = Tools::strtoupper($countryname);
-		$country = $countryname == 'SWEDEN' ? 209 : $countryname;
-        
-        $bill_address = array(
-            'email'           => $this->context->customer->email,
-            'telno'           => $adrsBilling->phone,
-            'cellno'          => $adrsBilling->phone_mobile,
-            'fname'           => $adrsBilling->firstname,
-            'lname'           => $adrsBilling->lastname,
-            'company'         => $adrsBilling->company,
-            'careof'          => '',
-            'street'          => $adrsBilling->address1,
-            'house_number'    => '',
-            'house_extension' => '',
-            'zip'             => $adrsBilling->postcode,
-            'city'            => $adrsBilling->city,
-            'country'         => (string)$countryname,
-        );
-        
-        foreach( $ship_address as $key => $col ){
-            if( !is_array( $col )) {
-                $ship_address[$key] = utf8_decode( Encoding::fixUTF8($col));
-            }
-        }
-        foreach( $bill_address as $key => $col ){
-            if( !is_array( $col )) {
-                $bill_address[$key] = utf8_decode( Encoding::fixUTF8($col));
-            }
-        }
-        $products = $this->context->cart->getProducts();
-    	$cart_details = $this->context->cart->getSummaryDetails(null, true);
-    	
-        $vatrate =  0;
-		foreach ($products as $product) {
-			if(!empty($product['price'])){
-				$goods_list[] = array(
-					'qty'   => (int)$product['cart_quantity'],
-					'goods' => array(
-						'artno'    => $product['reference'],
-						'title'    => $product['name'],
-						'price'    => round($product['price']*100, 0),
-						'vat'      => (float)$product['rate'],
-						'discount' => 0.0,
-						'flags'    => 0,
-					)
-				);
-			}
-                $vatrate = $product['rate'];
-		}
-		$carrier = $cart_details['carrier'];
-		if( !empty($cart_details['total_discounts'])){
-			$discountamount = $cart_details['total_discounts'] / (($vatrate+100)/100);
-			if( !empty($discountamount)){
-				$goods_list[] = array(
-					'qty'   => 1,
-					'goods' => array(
-						'artno'    => '',
-						'title'    => $this->context->controller->module->l('Rabatt'),
-						'price'    => 0 - round(abs($discountamount*100),0),
-						'vat'      => $vatrate,
-						'discount' => 0.0,
-						'flags'    => 0,
-					)
-					
-				);
-			}
-		}
-
-		$totals = array('total_shipping','total_handling');
-		$label =  array();
-		//array('total_tax' => 'Tax :'. $cart_details['products'][0]['tax_name']);
-		foreach ($totals as $total) {
-		    $flag = $total == 'total_handling' ? 16 : ( $total == 'total_shipping' ? 8 : 0);
-		    if(empty($cart_details[$total]) || $cart_details[$total]<=0 ) continue;
-			if( $total == 'total_shipping' && $cart_details['free_ship'] == 1 ) continue;
-			if( empty($cart_details[$total]) ) {continue;}
-			
-			if($total == 'total_shipping'){
-				$carrier = new Carrier($this->context->cart->id_carrier, $this->context->cart->id_lang);
-				$vatrate = $carrier->getTaxesRate(new Address($this->context->cart->{Configuration::get('PS_TAX_ADDRESS_TYPE')}));
-			}
-
-			$goods_list[] = array(
-				'qty'   => 1,
-				'goods' => array(
-					'artno'    => '',
-					'title'    => isset($label[$total])? $label[$total] : ucwords( str_replace('_', ' ', str_replace('total_','', $total) ) ),
-					'price'    => round($cart_details[$total]*100,0),
-					'vat'      => (float)$vatrate,
-					'discount' => 0.0,
-					'flags'    => $flag|32,
-				)
-			);
-		}
-		$pclass = -1;
-		$cutomerId = (int)$this->context->cart->id_customer;
-		$cutomerId = $cutomerId >0 ? $cutomerId: time();
-
-		$transaction = array(
-			"order1"=>(string)time(),
-			'order2'=>'',
-			'gender'=>'',
-			"comment"=>'',
-			"flags"=>0,
-			"reference"=>"",
-			"reference_code"=>"",
-			"currency"=>$this->context->currency->iso_code,
-			"country"=>getCountryID(),
-			"language"=>$this->context->language->iso_code,
-			"pclass"=>$pclass,
-			"shipInfo"=>array("delay_adjust"=>"1"),
-			"travelInfo"=>array(),
-			"incomeInfo"=>array(),
-			"bankInfo"=>array(),
-			"sid"=>array("time"=>microtime(true)),
-			"extraInfo"=>array(array("cust_no"=>"0" ,"creditcard_data"=> $_REQUEST))
-		);
-
-		if(Configuration::get('BCARDPAY_AUTHMOD') == 'sale' ) $transaction["extraInfo"][0]["status"] = 'Paid';
-
 		$timestart = microtime(true);
-		$measurements = array();
 
-		$k = $this->getBillmate();
-		$result1 = $k->AddOrder('',$bill_address,$ship_address,$goods_list,$transaction);
-		
+		$measurements = array();
 		$measurements['add_order'] =  microtime(true) - $timestart;
 		$duration = ( microtime(true)-$timetotalstart ) * 1000;
-		$k->stat("client_card_add_order_measurements",json_encode(array('order_id'=>$order_id, 'measurements'=>$measurements)), '', $duration);
+		//$k->stat("client_card_add_order_measurements",json_encode(array('order_id'=>$order_id, 'measurements'=>$measurements)), '', $duration);
 	}
 
 	function getBillmate(){
@@ -391,48 +183,38 @@ class BillmateCardpayValidationModuleFrontController extends ModuleFrontControll
             'NLD' => 'EUR',
         );
 		
-		
-		//$country = 209;
 		$encoding = 2;
-		
 		$country = $countryname == 'SWEDEN' ? '209' : $countryname;
-		
         $ship_address = array(
-            'email'           => $this->context->customer->email,
-            'telno'           => $adrsDelivery->phone,
-            'cellno'          => $adrsDelivery->phone_mobile,
-            'fname'           => $adrsDelivery->firstname,
-            'lname'           => $adrsDelivery->lastname,
-            'company'         => $adrsDelivery->company,
-            'careof'          => '',
-            'street'          => $adrsDelivery->address1,
-            'zip'             => $adrsDelivery->postcode,
-            'city'            => $adrsDelivery->city,
-            'country'         => $countryname,
+			"firstname" 	=> $adrsDelivery->firstname,
+			"lastname" 		=> $adrsDelivery->lastname,
+			"company" 		=> $adrsDelivery->company,
+			"street" 		=> $adrsDelivery->address1,
+			"street2" 		=> "",
+			"zip" 			=> $adrsDelivery->postcode,
+			"city" 			=> $adrsDelivery->city,
+			"country" 		=> (string)$countryname,
+			"phone" 		=> $adrsDelivery->phone_mobile,
         );
 
         $country = new Country(intval($adrsBilling->id_country));
-        
         $countryname = BillmateCountry::getContryByNumber( BillmateCountry::fromCode($countryObj->iso_code)  );
 		$country = $countryname == 'SWEDEN' ? 209 : Tools::strtoupper($countryname);
         
         $bill_address = array(
-            'email'           => $this->context->customer->email,
-            'telno'           => $adrsBilling->phone,
-            'cellno'          => $adrsBilling->phone_mobile,
-            'fname'           => $adrsBilling->firstname,
-            'lname'           => $adrsBilling->lastname,
-            'company'         => $adrsBilling->company,
-            'careof'          => '',
-            'street'          => $adrsBilling->address1,
-            'house_number'    => '1',
-            'house_extension' => '',
-            'zip'             => $adrsBilling->postcode,
-            'city'            => $adrsBilling->city,
-            'country'         => $countryname,
+			"firstname" 	=> $adrsBilling->firstname,
+			"lastname" 		=> $adrsBilling->lastname,
+			"company" 		=> $adrsBilling->company,
+			"street" 		=> $adrsBilling->address1,
+			"street2" 		=> "",
+			"zip" 			=> $adrsBilling->postcode,
+			"city" 			=> $adrsBilling->city,
+			"country" 		=> (string)$countryname,
+			"phone" 		=> $adrsBilling->phone_mobile,
+			"email" 		=> $this->context->customer->email,
         );
         
-        foreach( $ship_address as $key => $col ){
+        /*foreach( $ship_address as $key => $col ){
             if( !is_array( $col )) {
                 $ship_address[$key] = utf8_decode( Encoding::fixUTF8($col));
             }
@@ -441,49 +223,51 @@ class BillmateCardpayValidationModuleFrontController extends ModuleFrontControll
             if( !is_array( $col )) {
                 $bill_address[$key] = utf8_decode( Encoding::fixUTF8($col));
             }
-        }
+        }*/
+		
         $products = $this->context->cart->getProducts();
     	$cart_details = $this->context->cart->getSummaryDetails(null, true);
     	
-        $vatrate =  0;
+        $taxrate =  0;
 		foreach ($products as $product) {
 			if(!empty($product['price'])){
+				$goods_taxrate = $product['rate'];
+				$goods_withoutTax = $product['price'] * $product['cart_quantity'];
+				$goods_tax = ($goods_withoutTax/100)*$goods_taxrate;
 				$goods_list[] = array(
-					'qty'   => (int)$product['cart_quantity'],
-					'goods' => array(
-						'artno'    => $product['reference'],
-						'title'    => $product['name'],
-						'price'    => round($product['price']*100, 0),
-						'vat'      => (float)$product['rate'],
-						'discount' => 0.0,
-						'flags'    => 0,
-					)
-				);
+									"artnr" => $product['reference'],
+									"title" => $product['name'],
+									"quantity" => $product['cart_quantity'],
+									"aprice" => round($product['price'] * 100, 0),
+									"taxrate" => $goods_taxrate,
+									"discount" => 0.0,
+									"withouttax" => round($goods_withoutTax * 100, 0),
+									"tax" => round($goods_tax * 100, 0),
+								);				
 			}
-                $vatrate = $product['rate'];
+			$taxrate = $product['rate'];
 		}
+
 		$carrier = $cart_details['carrier'];
 		if( !empty($cart_details['total_discounts'])){
-			$discountamount = $cart_details['total_discounts'] / (($vatrate+100)/100);
-			if( !empty($discountamount)){
+			$discountamount = ($cart_details['total_discounts'] / (($taxrate+100)/100))*100;
+			if( !empty( $discountamount )){
 				$goods_list[] = array(
-					'qty'   => 1,
-					'goods' => array(
-						'artno'    => '',
-						'title'    => $this->context->controller->module->l('Rabatt'),
-						'price'    => 0 - round(abs($discountamount*100),0),
-						'vat'      => $vatrate,
-						'discount' => 0.0,
-						'flags'    => 0,
-					)
-					
-				);
+									"artnr" => '',
+									"title" => $this->context->controller->module->l('Rabatt'),
+									"quantity" => 1,
+									"aprice" => 0 - abs(round($discountamount,0)),
+									"taxrate" => $taxrate,
+									"discount" => 0.0,
+									"withouttax" => 0 - abs(round($discountamount,0)),
+									"tax" => 0 - round((($discountamount/100)*$taxrate),0),
+								);
 			}
 		}
 
 		$totals = array('total_shipping','total_handling');
 		$label =  array();
-		//array('total_tax' => 'Tax :'. $cart_details['products'][0]['tax_name']);
+		$shippingPrice = $shippingTax = $shippingTaxRate = $handlingPrice = $handlingTax = $handlingTaxRate = 0;
 		foreach ($totals as $total) {
 		    $flag = $total == 'total_handling' ? 16 : ( $total == 'total_shipping' ? 8 : 0);
 		    if(empty($cart_details[$total]) || $cart_details[$total]<=0 ) continue;
@@ -492,60 +276,92 @@ class BillmateCardpayValidationModuleFrontController extends ModuleFrontControll
 
 			if($total == 'total_shipping'){
 				$carrier = new Carrier($this->context->cart->id_carrier, $this->context->cart->id_lang);
-				$vatrate = $carrier->getTaxesRate(new Address($this->context->cart->{Configuration::get('PS_TAX_ADDRESS_TYPE')}));
+				$taxrate = $carrier->getTaxesRate(new Address($this->context->cart->{Configuration::get('PS_TAX_ADDRESS_TYPE')}));
+
+				$shippingPrice = $cart_details[$total] / (1+$taxrate/100);
+				$shippingTax = (($shippingPrice/100)*$taxrate);
+				$shippingTaxRate = $taxrate;
 			}
 
-			$goods_list[] = array(
-				'qty'   => 1,
-				'goods' => array(
-					'artno'    => '',
-					'title'    => isset($label[$total])? $label[$total] : ucwords( str_replace('_', ' ', str_replace('total_','', $total) ) ),
-					'price'    => round($cart_details[$total]*100, 0),
-					'vat'      => (float)$vatrate,
-					'discount' => 0.0,
-					'flags'    => $flag|32,
-				)
-			);
+			if($total == 'total_handling'){
+				$handlingPrice = $cart_details[$total] / (1+$taxrate/100);
+				$handlingTax = (($handlingPrice/100)*$taxrate);
+				$handlingTaxRate = $taxrate;
+			}
 		}
+		
 		$pclass = -1;
 		$cutomerId = (int)$this->context->cart->id_customer;
 		$cutomerId = $cutomerId >0 ? $cutomerId: time();
 
-		$transaction = array(
-			"order1"=>(string)$order_id,
-			"comment"=>'',
-			'order2'=>'',
-			"flags"=>0,
-			'gender'=>'',
-			"reference"=>"",
-			"reference_code"=>"",
-			"currency"=>$this->context->currency->iso_code,
-			"country"=>getCountryID(),
-			"language"=>$this->context->language->iso_code,
-			"pclass"=>$pclass,
-			"shipInfo"=>array("delay_adjust"=>"1"),
-			"travelInfo"=>array(),
-			"incomeInfo"=>array(),
-			"bankInfo"=>array(),
-			"sid"=>array("time"=>microtime(true)),
-			"extraInfo"=>array(array("cust_no"=>"0" ,"creditcard_data"=> $_REQUEST))
-		);
-
-		if(Configuration::get('BCARDPAY_AUTHMOD') == 'sale' ) $transaction["extraInfo"][0]["status"] = 'Paid';
 		if( empty($bill_address) || empty($ship_address) || empty($goods_list)) return false;
 
 		if( isset($_SESSION['INVOICE_CREATED_CARD']) ){
 			$result1 = array($_SESSION['INVOICE_CREATED_CARD']);
 		} else {
-			$result1 = $k->AddInvoice('',$bill_address,$ship_address,$goods_list,$transaction);  
+			$invoiceValues = array();
+			$invoiceValues['PaymentData'] = array(	"method" => "8",		//1=Factoring, 2=Service, 4=PartPayment, 8=Card, 16=Bank, 24=Card/bank and 32=Cash.
+													"paymentplanid" => $pclass,
+													"currency" => $this->context->currency->iso_code, //"SEK",
+													"language" => "sv",
+													"country" => "SE",
+													"autoactivate" => (Configuration::get('BCARDPAY_AUTHMOD') == 'sale')?"1":"0",
+													"orderid" => (string)$order_id,
+												);
+			$invoiceValues['PaymentInfo'] = array( 	"paymentdate" => date('Y-m-d'),
+													"paymentterms" => "14",
+													"yourreference" => "",
+													"ourreference" => "",
+													"projectname" => "",
+													"delivery" => "Post",
+													"deliveryterms" => "FOB",
+											);
+			$invoiceValues['Card'] = array(	"promptname" => (Configuration::get('BILL_PRNAME') == 'YES')?1:0,
+											"3dsecure" => (Configuration::get('BILL_3DSECURE')=='YES'?1:0),
+											"recurring" => "",
+											"recurringnr" => "",
+											"accepturl" => $this->context->link->getModuleLink('billmatecardpay', 'validation', array(), true),
+											"cancelurl" => $this->context->link->getModuleLink('billmatecardpay', 'cancelorder', array(), true),
+											"callbackurl" => $this->context->link->getModuleLink('billmatecardpay', 'callback', array(), true),
+									);
+			$invoiceValues['Customer'] = array(	'customernr'=> $cutomerId, 
+												'pno'=>$personalnumber, 
+												'Billing'=> $bill_address, 
+												'Shipping'=> $ship_address
+											);
+			$invoiceValues['Articles'] = $goods_list;
+			
+			$totalwithouttax = round($this->context->cart->getOrderTotal(false, Cart::BOTH)*100,0);
+			$totalwithtax = round($this->context->cart->getOrderTotal(true, Cart::BOTH)*100,0);
+			$totaltax = round(($totalwithtax - $totalwithouttax),0);
+			$rounding = $totalwithtax - ($totalwithouttax+$totaltax);
+			
+			$invoiceValues['Cart'] = array(
+										"Handling" => array(
+											"withouttax" => ($handlingPrice)?round($handlingPrice*100,0):0,
+											"taxrate" => ($handlingTaxRate)?$handlingTaxRate:0
+										),
+										"Shipping" => array(
+											"withouttax" => ($shippingPrice)?round($shippingPrice*100,0):0,
+											"taxrate" => ($shippingTaxRate)?$shippingTaxRate:0
+										),
+										"Total" => array(
+											"withouttax" => $totalwithouttax,
+											"tax" => $totaltax,
+											"rounding" => $rounding,
+											"withtax" => $totalwithtax,
+										)
+									);
+			$result1 = (object)$k->AddPayment($invoiceValues);
 		}
 
-		if(is_string($result1) || isset($result1['error']) || !is_array($result1))
+		if(is_string($result1) || (isset($result1->message) && is_object($result1)) || is_array($result1) )
 		{
-			throw new Exception(utf8_encode($result1), 122);
+			echo $result1->message. ' <a href="'.$this->context->link->getPageLink('order.php', true).'">click here</a>';
+			throw new Exception($result1);
 		}else{
-			$_SESSION['INVOICE_CREATED_CARD'] = $result1[0];
+			$_SESSION['INVOICE_CREATED_CARD'] = $result1->number;
 		}
-		return array('invoiceid' => $result1[0], 'api' => $k );
+		return $result1;
     }
 }

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <module>
 	<name>billmatecardpay</name>
-	<displayName><![CDATA[BillMate Cardpay]]></displayName>
-	<version><![CDATA[1.35]]></version>
-	<description><![CDATA[Accepts cardpay payments by BillMate]]></description>
-	<author><![CDATA[Billmate AB]]></author>
+	<displayName><![CDATA[Billmate Cardpay]]></displayName>
+	<version><![CDATA[2.0]]></version>
+	<description><![CDATA[Accepts cardpay payments by Billmate]]></description>
+	<author><![CDATA[eFinance Nordic AB]]></author>
 	<tab><![CDATA[payments_gateways]]></tab>
 	<confirmUninstall><![CDATA[Are you sure you want to delete your settings?]]></confirmUninstall>
 	<is_configurable>1</is_configurable>

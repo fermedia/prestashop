@@ -44,9 +44,9 @@ class BillmatePartpayment extends PaymentModule
 	private $_postValidations = array();
 	public $countries = array(
 		'SE' => array('name' =>'SWEDEN', 'code' => 'SE', 'langue' => 'SV', 'currency' => 'SEK', 'id'=> 209),
-		'NO' => array('name' =>'NORWAY', 'code' => 'NO', 'langue' => 'NB', 'currency' => 'NOK', 'id'=> 164),
-		'DK' => array('name' =>'DENMARK', 'code' => 'DK', 'langue' => 'DA', 'currency' => 'DKK', 'id'=> 59),
-		'FI' => array('name' =>'FINLAND', 'code' => 'FI', 'langue' => 'FI', 'currency' => 'EUR', 'id'=> 73),
+		//'NO' => array('name' =>'NORWAY', 'code' => 'NO', 'langue' => 'NB', 'currency' => 'NOK', 'id'=> 164),
+		//'DK' => array('name' =>'DENMARK', 'code' => 'DK', 'langue' => 'DA', 'currency' => 'DKK', 'id'=> 59),
+		//'FI' => array('name' =>'FINLAND', 'code' => 'FI', 'langue' => 'FI', 'currency' => 'EUR', 'id'=> 73),
 		//'GB' => array('name' =>'UNITED_KINGDOM', 'code' => 'GB', 'langue' => 'GB', 'currency' => 'GBP'),
 		//'US' => array('name' =>'UNITED_STATES', 'code' => 'US', 'langue' => 'US', 'currency' => 'USD'),
 	);
@@ -91,7 +91,7 @@ class BillmatePartpayment extends PaymentModule
         $this->name = 'billmatepartpayment';
         $this->moduleName='billmatepartpayment';
         $this->tab = 'payments_gateways';
-        $this->version = '1.35';
+        $this->version = '2.0';
         $this->author  = 'Billmate AB';
 
         $this->currencies = true;
@@ -320,9 +320,10 @@ class BillmatePartpayment extends PaymentModule
 				}catch(Exception $ex){
 					$this->_postErrors[] = $ex->getMessage().' - '.$country['name'];
 				}
-				Configuration::updateValue('BILLMATE_STORE_ID_'.$country['name'], $storeId);				
+				Configuration::updateValue('BILLMATE_STORE_ID_'.$country['name'], $storeId);
+				
 				Configuration::updateValue('BILLMATE_SECRET_'.$country['name'], $secret);
-				Configuration::updateValue('BILLMATE_ORDER_STATUS_'.$country['name'], (int)(Tools::getValue('billmateOrderStatus'.$country['name'])));				
+				Configuration::updateValue('BILLMATE_ORDER_STATUS_'.$country['name'], (int)(Tools::getValue('billmateOrderStatus'.$country['name'])));
 				Configuration::updateValue('BILLMATE_MIN_VALUE_'.$country['name'], (float)Tools::getValue('billmateMinimumValue'.$country['name']));
 				Configuration::updateValue('BILLMATE_MAX_VALUE_'.$country['name'], ($_POST['billmateMaximumValue'.$country['name']] != 0 ? (float)Tools::getValue('billmateMaximumValue'.$country['name']) : 99999));
 			}
@@ -464,7 +465,7 @@ class BillmatePartpayment extends PaymentModule
         
         $countryname = BillmateCountry::getContryByNumber( BillmateCountry::fromCode($country->iso_code)  );
         $countryname = Tools::strtoupper($countryname);
-       
+
         $minVal = Configuration::get('BILLMATE_MIN_VALUE_'.$countryname);
         $maxVal = Configuration::get('BILLMATE_MAX_VALUE_'.$countryname);
         
@@ -475,9 +476,10 @@ class BillmatePartpayment extends PaymentModule
 		$countryString  = $this->countries[$country->iso_code]['code'];
 		$language = $this->countries[$country->iso_code]['langue'];
 		$currency = $this->countries[$country->iso_code]['currency'];
-		
+
 		$billmate = new pClasses($eid, $secret,$countryString, $language, $currency, $mode);
 		$pclass = $billmate->getCheapestPClass((float)$this->context->cart->getOrderTotal(), BillmateFlags::CHECKOUT_PAGE);
+		
 		if($_SERVER['REMOTE_ADDR'] == '122.173.227.3'){
 			;
 			// var_dump($total , $minVal , $total , $maxVal);
@@ -526,10 +528,6 @@ class BillmatePartpayment extends PaymentModule
      */
     public function hookPaymentReturn($params)
     {
-		if(version_compare(PS_VERSION,'1.5','<')){
-			return $this->display(dirname(__FILE__).'/', 'tpl/order-confirmation.tpl');
-		} else {
-			return $this->display(__FILE__,'confirmation.tpl');
-		}
+        return $this->display(__FILE__, 'confirmation.tpl');
     }
 }

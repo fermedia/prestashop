@@ -43,17 +43,17 @@ $sql[] = 'CREATE TABLE IF NOT EXISTS `'._DB_PREFIX_.'billmate_rno` (
 
 $sql[] = 'DROP TABLE IF EXISTS `'._DB_PREFIX_.'billmate_payment_pclasses`';
 $sql[] = 'CREATE TABLE IF NOT EXISTS `'._DB_PREFIX_.'billmate_payment_pclasses` (
-                `eid` int(10) unsigned NOT NULL,
-                `id` int(10) unsigned NOT NULL,
-                `type` tinyint(4) NOT NULL,
                 `description` varchar(255) NOT NULL,
-                `months` int(11) NOT NULL,
-                `interestrate` decimal(11,2) NOT NULL,
-                `invoicefee` decimal(11,2) NOT NULL,
+                `nbrofmonths` int(11) NOT NULL,
                 `startfee` decimal(11,2) NOT NULL,
+                `handlingfee` decimal(11,2) NOT NULL,
                 `minamount` decimal(11,2) NOT NULL,
                 `maxamount` decimal(11,2) NOT NULL,
+                `type` tinyint(4) NOT NULL,
+                `expirydate` int(11) NOT NULL,
+                `interestrate` decimal(11,2) NOT NULL,
                 `country` int(11) NOT NULL,
-                `expire` int(11) NOT NULL,
+                `eid` int(10) unsigned NOT NULL,
+                `id` int(10) unsigned NOT NULL,
                KEY `id` (`id`)
             ) ENGINE='._MYSQL_ENGINE_.' DEFAULT CHARSET=utf8;';

@@ -95,8 +95,8 @@
 		<td>{$countryCodes[$pclass.country]}</td>
 		<td>{$pclass.description}</td>
 		<td>{$pclass.startfee}</td>
-		<td>{$pclass.expire}</td>
-		<td>{$pclass.invoicefee}</td>
+		<td>{$pclass.expirydate}</td>
+		<td>{$pclass.handlingfee}</td>
 		<td>{$pclass.interestrate}</td>
 		<td>{$pclass.minamount}</td>
 		<td>{$pclass.maxamount}</td>

@@ -89,7 +89,7 @@ class BillmateInvoice extends PaymentModule
         $this->name = 'billmateinvoice';
         $this->moduleName='billmateinvoice';
         $this->tab = 'payments_gateways';
-        $this->version = '1.35';
+        $this->version = '2.0';
         $this->author  = 'Billmate AB';
 
         $this->currencies = true;
@@ -590,10 +590,6 @@ class BillmateInvoice extends PaymentModule
      */
     public function hookPaymentReturn($params)
     {
-		if(version_compare(PS_VERSION,'1.5','<')){
-			return $this->display(dirname(__FILE__).'/', 'tpl/order-confirmation.tpl');
-		} else {
-			return $this->display(__FILE__,'confirmation.tpl');
-		}
+        return $this->display(__FILE__, 'confirmation.tpl');
     }
 }

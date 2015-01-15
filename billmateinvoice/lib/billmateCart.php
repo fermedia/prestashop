@@ -37,7 +37,7 @@ class billmateCart extends PaymentModule{
 
 		$new_history = new OrderHistory();
 		$new_history->id_order = (int)$order->id;
-		$new_history->changeIdOrderState((int)Configuration::get('PS_OS_CANCELED'), $order->id, true);
+		$new_history->changeIdOrderState((int)Configuration::get('PS_OS_CANCELED'), $order, true);
 		$new_history->addWithemail(true);
 		if( isset($_SESSION['billmate_order_id'])){
 			unset($_SESSION['billmate_order_id']);
@@ -72,7 +72,7 @@ class billmateCart extends PaymentModule{
 		if( $prevOrder->id == Configuration::get('BILLMATE_PAYMENT_PENDING') ){
 			$new_history = new OrderHistory();
 			$new_history->id_order = (int)$order->id;
-			$new_history->changeIdOrderState((int)$order_status, $order->id, true);
+			$new_history->changeIdOrderState((int)$order_status, $order, true);
 			$new_history->addWithemail(true, $extra);
 		}
 		//call_user_func_array(array('Mail','Send'),$_SESSION['mailexecution']);
@@ -483,7 +483,7 @@ class billmateCart extends PaymentModule{
 						// If the reduction is not applicable to this order, then continue with the next one
 						if (!$values['tax_excl'])
 							continue;
-						
+
 						if (count($order_list) == 1 && $values['tax_incl'] > ($order->total_products_wt - $total_reduction_value_ti) && $cart_rule['obj']->partial_use == 1 && $cart_rule['obj']->reduction_amount > 0)
 						{
 							// Create a new voucher from the original

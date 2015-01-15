@@ -314,6 +314,7 @@ if(!function_exists('match_usernamevp')){
 				$filterStr2[] = $str2;
 			}
 		}
+
 		$foundName = array_intersect( $filterStr1, $filterStr2 );
 		return (count($foundName)==count($filterStr1));
 	}
