@@ -440,7 +440,7 @@ class BillmateBank extends PaymentModule
 	   if( version_compare(_PS_VERSION_, '1.5', '>=') ){
 		$moduleurl = $link->getModuleLink('billmatebank', 'validation', array(), true);
 	   }else{
-		$moduleurl = __PS_BASE_URI__.'modules/billmatebank/validation.php';
+		$moduleurl = __PS_BASE_URI__.'modules/billmatebank/controllers/front/validation.php';
 	   }
 	   
 		$smarty->assign('moduleurl', $moduleurl);

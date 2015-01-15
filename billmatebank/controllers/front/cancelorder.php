@@ -10,16 +10,19 @@ class BillmateBankCancelorderModuleFrontController extends ModuleFrontController
 
 	public function postProcess()
 	{
-		$response_data = json_decode($_REQUEST['data']);
+		$eid = (int)Configuration::get('BCARDPAY_STORE_ID_SETTINGS');
+		$secret = Configuration::get('BCARDPAY_SECRET_SETTINGS');
+		$ssl = true;
+		$debug = false;
+		$k = new BillMate($eid,$secret,$ssl,$debug,Configuration::get('BCARDPAY_MOD'));
+		$response_data = $k->verify_hash($_REQUEST);
 		$this->context = Context::getContext();
-		$ids = explode("-",$response_data->orderid);
-		if( sizeof($ids) < 2 ) return false;
-		$order_id = $ids[0]; $cart_id = $ids[1];
-		$order = new Order($order_id);
+
+		$order = new Order($response_data['orderid']);
 
 		$new_history = new OrderHistory();
 		$new_history->id_order = (int)$order->id;
-		$new_history->changeIdOrderState((int)Configuration::get('PS_OS_CANCELED'), $order, true);
+		$new_history->changeIdOrderState((int)Configuration::get('PS_OS_CANCELED'), $order->id, true);
 		$new_history->addWithemail(true);
 		$orderUrl = $this->context->link->getPageLink('order.php', true);
 		Tools::redirectLink($orderUrl);

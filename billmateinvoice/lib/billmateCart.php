@@ -37,7 +37,7 @@ class billmateCart extends PaymentModule{
 
 		$new_history = new OrderHistory();
 		$new_history->id_order = (int)$order->id;
-		$new_history->changeIdOrderState((int)Configuration::get('PS_OS_CANCELED'), $order, true);
+		$new_history->changeIdOrderState((int)Configuration::get('PS_OS_CANCELED'), $order->id, true);
 		$new_history->addWithemail(true);
 		if( isset($_SESSION['billmate_order_id'])){
 			unset($_SESSION['billmate_order_id']);
@@ -615,7 +615,7 @@ class billmateCart extends PaymentModule{
 					$order = $this->recast('Order',$order);
 					$new_history = new OrderHistory();
 					$new_history->id_order = (int)$order->id;
-					$new_history->changeIdOrderState((int)$id_order_state, $order, true);
+					$new_history->changeIdOrderState((int)$id_order_state, $order->id, true);
 					$new_history->addWithemail(true, $extra_vars);
 
 					// Switch to back order if needed
@@ -623,7 +623,7 @@ class billmateCart extends PaymentModule{
 					{
 						$history = new OrderHistory();
 						$history->id_order = (int)$order->id;
-						$history->changeIdOrderState(Configuration::get('PS_OS_OUTOFSTOCK'), $order, true);
+						$history->changeIdOrderState(Configuration::get('PS_OS_OUTOFSTOCK'), $order->id, true);
 						$history->addWithemail();
 					}
 

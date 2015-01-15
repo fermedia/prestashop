@@ -34,10 +34,11 @@ require(_PS_MODULE_DIR_.'billmatepartpayment/backward_compatibility/backward.php
 
 //define('BBANK_BASE', dirname(__FILE__));
 
-require_once BBANK_BASE. '/BillMate.php';
-require_once BBANK_BASE. '/utf8.php';
-include_once(BBANK_BASE."/xmlrpc-2.2.2/lib/xmlrpc.inc");
-include_once(BBANK_BASE."/xmlrpc-2.2.2/lib/xmlrpcs.inc");
+require_once BBANK_BASE. '/Billmate.php';
+require_once BBANK_BASE .'/lib/billmateCart.php';
+//require_once BBANK_BASE. '/utf8.php';
+//include_once(BBANK_BASE."/xmlrpc-2.2.2/lib/xmlrpc.inc");
+//include_once(BBANK_BASE."/xmlrpc-2.2.2/lib/xmlrpcs.inc");
 
 class BillmateBankController extends FrontController
 {

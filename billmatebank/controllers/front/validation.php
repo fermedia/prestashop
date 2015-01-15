@@ -28,31 +28,29 @@ class BillmateBankValidationModuleFrontController extends ModuleFrontController
 		$customer = new Customer($this->context->cart->id_customer);
 		if (!Validate::isLoadedObject($customer))
 			Tools::redirectLink(__PS_BASE_URI__.'order&step=1');
+		$k = $this->getBillmate();
+		$_DATA = $k->verify_hash($_REQUEST);
 
-		$_DATA = json_decode(stripslashes($_REQUEST['data']), true);
 	    if(isset($_DATA['status']) && !empty($_DATA['number']))
 		{
-			$ids = explode("-",$_DATA['orderid']);
-			if( sizeof($ids) < 2 ) return false;
-			$_DATA['order_id'] = $ids[0];
-			$_DATA['cart_id'] = $ids[1];
+
 			$invoiceid = $_DATA['number'];
 			
-			$this->context->cart->id = (int)$_DATA['cart_id'];
+			$this->context->cart->id = (int)Order::getCartByOrderId($_DATA['orderid']);
 			
 			$eid = (int)Configuration::get('BBANK_STORE_ID_SWEDEN');
 
 		    if( $_DATA['status'] == 'Paid' ){
 		        try{
-					$order = new Order($_DATA['order_id']);
-					$orderhistory = OrderHistory::getLastOrderState((int)$_DATA['order_id']);
+					$order = new Order($_DATA['orderid']);
+					$orderhistory = OrderHistory::getLastOrderState((int)$_DATA['orderid']);
 
 					if( $orderhistory->id != Configuration::get('BBANK_ORDER_STATUS_SWEDEN')){
 
 						$data = $measurements = array();
 						
 						$t = new billmateCart();
-						$t->id = $_DATA['order_id'];
+						$t->id = $_DATA['orderid'];
 						
 						$timestart = microtime(true);
 						$customer = new Customer((int)$this->context->cart->id_customer);
@@ -72,10 +70,10 @@ class BillmateBankValidationModuleFrontController extends ModuleFrontController
 						
 						$timestart = microtime(true);
 						$k = $this->getBillmate();
-						$k->UpdatePayment( array('PaymentData'=> array("number"=>(string)$invoiceid, "orderid"=>(string)$_DATA['order_id'], "currency" => "SEK", "language" => "sv", "country" => "se")) ); 
+						$k->UpdatePayment( array('PaymentData'=> array("number"=>(string)$invoiceid, "orderid"=>(string)$_DATA['orderid'], "currency" => "SEK", "language" => "sv", "country" => "se")) );
 						unset($_SESSION["uniqueId"]);
 						$measurements['update_order_no'] = microtime(true) - $timestart;
-						$duration = ( microtime(true)-$timetotalstart ) * 1000;
+						//$duration = ( microtime(true)-$timetotalstart ) * 1000;
 
 						//$k->stat("client_order_measurements", json_encode(array('order_id'=>$this->module->currentOrder, 'measurements'=>$measurements)), '', $duration);
 					}else{
@@ -131,6 +129,9 @@ class BillmateBankValidationModuleFrontController extends ModuleFrontController
 		$t->name="billmatebank";
 		$extra = array('transaction_id'=>time());
 		$customer = new Customer((int)$this->context->cart->id_customer);
+		if(version_compare(_PS_VERSION_,'1.5','<')){
+			$this->context = Context::getContext();
+		}
 		if(isset($_SESSION['INVOICE_CREATED_BANK']) ){
 			$t->cancelOrder($_SESSION['billmate_order_id']);
 			unset($_SESSION['INVOICE_CREATED_BANK']);
@@ -148,7 +149,7 @@ class BillmateBankValidationModuleFrontController extends ModuleFrontController
 		}
 
 		$order_id = $_SESSION['billmate_order_id'] = $t->currentOrder;
-		$orderid = $order_id.'-'.$this->context->cart->id;
+		$orderid = $order_id;//.'-'.$this->context->cart->id;
 		$data_return = $this->processReserveInvoice( strtoupper($this->context->country->iso_code), $orderid);	
 		$data['url'] = $data_return->url;
 		$this->context->smarty->assign($data);
@@ -319,15 +320,24 @@ class BillmateBankValidationModuleFrontController extends ModuleFrontController
 													"delivery" => "Post",
 													"deliveryterms" => "FOB",
 											);
-
+			$callback = $accept = $cancel = '';
+			if(version_compare(_PS_VERSION_,'1.5','<')){
+				$accept =  _PS_BASE_URL_.__PS_BASE_URI__.'modules/billmatebank/controllers/front/validation.php';
+				$cancel =  _PS_BASE_URL_.__PS_BASE_URI__.'modules/billmatebank/controllers/front/cancelorder.php';
+				$callback = _PS_BASE_URL_.__PS_BASE_URI__.'modules/billmatebank/controllers/front/callback.php';
+			} else {
+				$accept = $this->context->link->getModuleLink('billmatebank', 'validation', array(), true);
+				$cancel = $this->context->link->getModuleLink('billmatebank', 'cancelorder', array(), true);
+				$callback = $this->context->link->getModuleLink('billmatebank', 'callback', array(), true);
+			}
 			$invoiceValues['Card'] = array(	"promptname" => "",
 											"3dsecure" => "",
 											"recurring" => "",
 											"recurringnr" => "",
-											"accepturl" => $this->context->link->getModuleLink('billmatebank', 'validation', array(), true),
-											"cancelurl" => $this->context->link->getModuleLink('billmatebank', 'cancelorder', array(), true),
+											"accepturl" => $accept,
+											"cancelurl" => $cancel,
 											"returnmethod" => "",
-											"callbackurl" => $this->context->link->getModuleLink('billmatebank', 'callback', array(), true),
+											"callbackurl" => $callback,
 									);
 			$invoiceValues['Customer'] = array(	'customernr'=> $cutomerId, 
 												'pno'=>$personalnumber, 
