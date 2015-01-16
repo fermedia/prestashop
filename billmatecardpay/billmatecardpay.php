@@ -44,7 +44,7 @@ class BillmateCardpay extends PaymentModule
     
 	private $_postValidations = array();
 	private $countries = array(
-		'SE' => array('name' =>'SETTINGS', 'code' => BillmateCountry::SE, 'langue' => BillmateLanguage::SV, 'currency' => BillmateCurrency::SEK)
+		//'SE' => array('name' =>'SETTINGS', 'code' => BillmateCountry::SE, 'langue' => BillmateLanguage::SV, 'currency' => BillmateCurrency::SEK)
 	);
 
 	const RESERVED = 1;
@@ -56,15 +56,18 @@ class BillmateCardpay extends PaymentModule
      */
     public function __construct()
     {
+		$this->countries = array(
+			'SE' => array('name' => 'SWEDEN', 'code' => BillmateCountry::SE, 'langue' => BillmateLanguage::SV, 'currency' => BillmateCurrency::SEK)
+		);
         $this->name = 'billmatecardpay';
         $this->moduleName='billmatecardpay';
         $this->tab = 'payments_gateways';
         $this->version = '2.0';
-        $this->author  = 'eFinance Nordic AB';
+        $this->author  = 'Billmate AB';
 
         $this->currencies = true;
         $this->currencies_mode = 'radio';
-
+		require(_PS_MODULE_DIR_.'billmatepartpayment/backward_compatibility/backward.php');
         parent::__construct();
         $this->core = null;
         $this->billmate = null;
@@ -81,7 +84,7 @@ class BillmateCardpay extends PaymentModule
         $this->billmate_merchant_id = Configuration::get('BCARDPAY_MERCHANT_ID');
         $this->billmate_secret = Configuration::get('BCARDPAY_SECRET');
         $this->billmate_countries = unserialize( Configuration::get('BILLMATE_ENABLED_COUNTRIES_LIST'));
-		require(_PS_MODULE_DIR_.'billmatepartpayment/backward_compatibility/backward.php');
+
     }
 
 	private function _displayForm()

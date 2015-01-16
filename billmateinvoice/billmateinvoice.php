@@ -395,8 +395,9 @@ class BillmateInvoice extends PaymentModule
 					'id_product' => (int)$productInvoicefee->id,
 					'position' => (int)1,
 				);
-				StockAvailable::setQuantity(Tools::getValue((int)$productInvoicefee->id), '', Tools::getValue(10000), (int)Configuration::get('PS_SHOP_DEFAULT'));
-
+				if(version_compare(_PS_VERSION_,'1.5','>=')) {
+					StockAvailable::setQuantity(Tools::getValue((int)$productInvoicefee->id), '', Tools::getValue(10000), (int)Configuration::get('PS_SHOP_DEFAULT'));
+				}
 				$db = Db::getInstance();
 				if((version_compare(_PS_VERSION_,'1.5','>'))){
 					Db::getInstance()->insert('category_product', $product_cats,false,true,Db::INSERT_IGNORE);
